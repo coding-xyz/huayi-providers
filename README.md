@@ -4,7 +4,7 @@
 
 Required files:
 
-- ./fake_huayi/
+- ./huayi_providers/fake_huayi/
     - \_\_init\_\_.py
     - fake_huayi.py
     - props_huayi.json
@@ -17,7 +17,7 @@ Required files:
 Import FakeHuayi backend
 
 ```
-from fake_huayi import *
+from huayi_providers.fake_huayi import *
 FackHuayi()    # for V1 backend
 FackHuayiV2()  # for V2 backend
 ```
@@ -31,11 +31,11 @@ noise_Huayi = NoiseModel.from_backend(FakeHuayi())
 Create .json files that required to build the backend
 
 ```
-from fake_huayi.HuayiBacken_build import create
-c = create(backend_name="huayi",
-           backend_version="x.x.x",
-           qubits_data="qubits_data.csv",
-           gates_data="gates_data.csv")
+from huayi_providers.backend_build import build_from_file
+c = build_from_file(backend_name="huayi",
+                    backend_version="x.x.x",
+                    qubits_data="qubits_data.csv",
+                    gates_data="gates_data.csv")
 ```
 
 ## File Structure
