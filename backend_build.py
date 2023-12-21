@@ -13,31 +13,34 @@ def now_time():
 class build_from_file:
 
     def __init__(self,
-                 backend_name,
-                 backend_version,
-                 qubits_data,
-                 gates_data):
+                 backend_name:str,
+                 backend_version:str,
+                 qubits_data:str,
+                 gates_data:str,
+                 gate_radius=None):
 
         self.backend_dir = "fake_{}".format(backend_name)
         self.backend_absdir = os.path.join(os.path.dirname(__file__), self.backend_dir)
-        self.create_init_file(backend_name)
-        
-        self.create_props(backend_name,
+
+        if all((
+            self.create_init_file(backend_name),
+            self.create_props(backend_name,
                           backend_version,
                           qubits_data,
-                          gates_data)
-        self.create_conf(backend_name,
-                         backend_version)
-
-        print("New backends created, please import the backends with:")
-        print("from huayi_providers.{} import {}, {}".format(self.backend_dir, self.backend_names[0], self.backend_names[1]))
+                          gates_data),
+            self.create_conf(backend_name,
+                         backend_version,
+                         gate_radius)
+        )):
+            print("New backends created, please import the backends with:")
+            print("from huayi_providers.{} import {}, {}".format(self.backend_dir, self.backend_names[0], self.backend_names[1]))
     
 
     def create_props(self,
                      backend_name,
                      backend_version,
                      qubits_data,
-                     gates_data):
+                     gates_data) -> bool:
         try:
             qubits_info = pandas.read_csv(qubits_data)
             qubits = []
@@ -83,73 +86,39 @@ class build_from_file:
                 self.props = BackendProperties.from_dict(props)
                 print("Successfully created props_{}.json".format(backend_name))
 
+            return True
+
         except IOError as e:
             print("Failed to create props_{}.json".format(backend_name))
             print(e)
+            return False
 
 
     def create_conf(self,
                     backend_name,
-                    backend_version):
+                    backend_version,
+                    gates_radius) -> bool:
         
         try:
             n_qubits = self.n_qubits
             # Fully connected map
-            coupling_map = [[i,j] for i in range(n_qubits) 
-                            for j in list(range(i))+list(range(i+1,n_qubits))]
+            if gates_radius:
+                coupling_map = [[i,j] for i in range(n_qubits) 
+                                for j in list(range(max(0,i-gates_radius),i))+list(range(i+1,min(i+1+gates_radius,n_qubits)))]
+            else:
+                coupling_map = [[i,j] for i in range(n_qubits) 
+                                for j in list(range(i))+list(range(i+1,n_qubits))]
 
             basis_gates = [
                 "id",
                 "rx",
                 "ry",
-                "rz",
                 "cz",
-                "xy",
                 "reset"]
 
-            # basis_gates = [
-            #     "ccx",
-            #     "ch",
-            #     "cnot",
-            #     "cp",
-            #     "crx",
-            #     "cry",
-            #     "crz",
-            #     "csx",
-            #     "cx",
-            #     "cy",
-            #     "cz",
-            #     "h",
-            #     "i",
-            #     "id",
-            #     "mcp",
-            #     "mcphase",
-            #     "mct",
-            #     "mcx",
-            #     "mcx_gray",
-            #     "measure",
-            #     "p",
-            #     "rx",
-            #     "rxx",
-            #     "ry",
-            #     "ryy",
-            #     "rz",
-            #     "rzz",
-            #     "s",
-            #     "sdg",
-            #     "swap",
-            #     "sx",
-            #     "sxdg",
-            #     "t",
-            #     "tdg",
-            #     "toffoli",
-            #     "x",
-            #     "y",
-            #     "z",
-            # ]
-
-
-
+            # Definition of gates configurations requires OpenQASM
+            # See Specifications: https://openqasm.com/language/gates.html#defining-gates
+            # also: https://dl.acm.org/doi/10.1145/3505636
             gates = []
             gates.append(GateConfig(
                 name='id',
@@ -157,37 +126,24 @@ class build_from_file:
                 qasm_def="gate id q { id q; }",
                 coupling_map=[[i] for i in range(n_qubits)]
                 ))
-            # gates.append(GateConfig(
-            #     name='GPI',
-            #     parameters=["theta"],
-            #     qasm_def="gate GPI(theta) q { U(pi, theta, -theta) q; }",
-            #     coupling_map=[[i] for i in range(n_qubits)]
-            #     )) 
-            # gates.append(GateConfig(
-            #     name='GPI2',
-            #     parameters=["theta"],
-            #     qasm_def="gate GPI2(theta) q { U(pi/2, theta, -theta) q; }",
-            #     coupling_map=[[i] for i in range(n_qubits)]
-            #     )) 
-            # gates.append(GateConfig(
-            #         name='x',
-            #         parameters=[],
-            #         qasm_def="gate id q { U(pi, 0, pi) q; }",
-            #         coupling_map=[[i] for i in range(n_qubits)]
-            #         ))
-            # gates.append(GateConfig(
-            #         name='rz',
-            #         parameters=["theta"],
-            #         qasm_def="gate rz(theta) q { U(0, 0, theta) q; }",
-            #         coupling_map=[[i] for i in range(n_qubits)]
-            #         ))
-            # gates.append(GateConfig(
-            #         name='ZZ',
-            #         parameters=["theta"],
-            #         qasm_def="gate ZZ(theta) q0, q1 { crz(theta) q1, q2; crz(-theta) q2, q1; }",
-            #         coupling_map=[[i,j] for i in range(n_qubits) 
-            #                     for j in range(i+1,n_qubits)]
-            #         ))
+            gates.append(GateConfig(
+                name='rx',
+                parameters=["θ"],
+                qasm_def="gate rx(θ) q { U(θ, -pi/2, pi/2) q; }",
+                coupling_map=[[i] for i in range(n_qubits)]
+                ))
+            gates.append(GateConfig(
+                name='ry',
+                parameters=["θ"],
+                qasm_def="gate ry(θ) q { U(θ, 0, 0) q; }",
+                coupling_map=[[i] for i in range(n_qubits)]
+                ))
+            gates.append(GateConfig(
+                name='cz',
+                parameters=[],
+                qasm_def="gate cz q1, q2 { ctrl @ z q1, q2; }",
+                coupling_map=coupling_map
+                ))
 
             conf = QasmBackendConfiguration(
                 backend_name=backend_name,
@@ -210,12 +166,15 @@ class build_from_file:
                 self.conf = QasmBackendConfiguration.from_dict(conf)
                 print("Successfully created conf_{}.json".format(backend_name))
 
+            return True
+
         except IOError as e:
             print("Failed to create props_{}.json".format(backend_name))
             print(e)
+            return False
 
 
-    def create_init_file(self, backend_name):
+    def create_init_file(self, backend_name) -> bool:
 
         try:
             if not os.path.isdir(self.backend_absdir):
@@ -225,8 +184,8 @@ class build_from_file:
             backend_name2 = "Fake{}V2".format(backend_name.title())
             
             with open(self.backend_absdir+"/__init__.py",'w') as f:
-                print("from .{0} import {1}\n".format(self.backend_dir, backend_name1), file=f)
-                print("from .{0} import {1}\n".format(self.backend_dir, backend_name2), file=f)
+                f.write("from .{0} import {1}\n".format(self.backend_dir, backend_name1))
+                f.write("from .{0} import {1}\n".format(self.backend_dir, backend_name2))
     
             with open(self.backend_absdir+"/fake_{}.py".format(backend_name),'w') as f:
                 f.write("import os\n")
@@ -245,8 +204,21 @@ class build_from_file:
                 f.write("\tbackend_name = 'fake_{}'\n".format(backend_name))
 
                 self.backend_names = [backend_name1, backend_name2]
+
+            isimported = False
+            with open(os.path.dirname(__file__)+"/__init__.py", 'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    if "from .{} import *".format(self.backend_dir) in line:
+                        isimported = True
+            if not isimported:
+                with open(os.path.dirname(__file__)+"/__init__.py", 'a') as f:
+                    f.write("\nfrom .{} import *".format(self.backend_dir))
+            
+            return True
             
         except IOError as e:
             print("Failed to create initializing scripts")
             print(e)
+            return False
 
