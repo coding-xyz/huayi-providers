@@ -95,6 +95,7 @@ def test_qv(device, nqubits, ncircuits, nshots):
         "n_qubits":nqubits,
         "QV": 2**nqubits, 
         "HOP": percent_heavy_outputs, 
+        "2sigma": cum_2sigma[-1]*100,
         "success": is_pass, 
         "n_circuits": ncircuits,
         "n_shots": nshots,
