@@ -1,48 +1,39 @@
-# Build FakeHuayi backend
+# Huayi Providers
+
 
 ## Basic Use
 
-Required files:
-
-- ./huayi_providers/fake_huayi/
-    - \_\_init\_\_.py
-    - fake_huayi.py
-    - props_huayi.json
-    - conf_huayi.json
-    - defs_huayi.json (if Pulse Backend is applied, TODO)
-- ./
-    - qubits_data.csv
-    - gates_data.csv
-
-Import FakeHuayi backend
+Import backend
 
 ```
-from huayi_providers.fake_huayi import *
-FackHuayi()    # for V1 backend
-FackHuayiV2()  # for V2 backend
+from huayi_providers.fake_{backend_name} import *
+Fake{backend_name}()    # for V1 backend
+Fake{backend_name}V2()  # for V2 backend
 ```
 
 Generate noise model
 ```
 from qiskit_aer.noise.noise_model import NoiseModel
-noise_Huayi = NoiseModel.from_backend(FakeHuayi())
+noise_model = NoiseModel.from_backend(Fake{backend_name}())
 ```
 
-Create .json files that required to build the backend
+Build backends from ``.csv`` files
 
 ```
 from huayi_providers.backend_build import build_from_file
-c = build_from_file(backend_name="huayi",
-                    backend_version="x.x.x",
-                    qubits_data="qubits_data.csv",
-                    gates_data="gates_data.csv")
+c = build_from_file(backend_name,
+                    backend_version,
+                    qubits_data,
+                    gates_data)
 ```
 
 ## File Structure
 
-#### Expriment data
+### Experiment data
 
-**qubits_data.csv** contains the information of qubits, including
+Qubits properties are Stored in ``./data/qubits_data_{backend_name}.csv`` and gates information in ``./data/gates_data_{backend_name}.csv``.
+
+``qubits_data_{}.csv`` contains the information of qubits, including
 - T1 time (ms)
 - T2 time (ms)
 - frequency (MHz)
@@ -53,7 +44,7 @@ c = build_from_file(backend_name="huayi",
 
 All information should be accompanied with the measurement date and time.
 
-**gates_data.csv** contains the information of gates, including
+``gates_data_{}.csv`` contains the information of gates, including
 - qubits
 - gate type
 - error rate
@@ -61,6 +52,18 @@ All information should be accompanied with the measurement date and time.
 - gate name (optional)
 
 The gate error and length are measured from experiment, and should be accompanied with the measurement date and time.
+
+### Backend files
+
+``from backend_build import build_from_file`` to generate the files for the backend.
+
+- ./fake_{backend_name}/
+    - \_\_init\_\_.py
+    - fake_{backend_name}.py
+    - props_{backend_name}.json
+    - conf_{backend_name}.json
+    - defs_{backend_name}.json (if Pulse Backend is applied, TODO)
+
 
 #### Dictionaries of the backend properties and configurations
 
@@ -111,3 +114,38 @@ The keys in NoiseModel are
 - local quantum errors
 - local readout errors
 - custom noise passes (set None by default)
+
+
+**local readout errors**
+
+```
+noise_model._local_readout_errors = {(0,):ReadoutError, 
+                                     (1,):ReadoutError, 
+                                     (2,):ReadoutError, ...}
+```
+
+``ReadoutError`` is essentially a matrix, the off-diagonal terms corresponds to ``prob_meas0_prep1`` and ``prob_meas1_prep0``
+
+If ``prob_meas0_prep1`` and ``prob_meas1_prep0`` are given, ``readout_error`` will be ignored.
+
+
+**local quantum errors**
+
+The errors of ``gate`` applied to indices ``ind = (i,) for one-bit gate, (i,j) for two-bit gate`` are stored in
+
+```
+noise_model._local_quantum_errors[gate][ind] = {
+  '_id': xxxx,
+  '_probs': list_of_probs,
+  '_circs': list_of_circs,
+  '_qargs': None,
+  '_op_shape': OpShape(num_qargs_l, num_qargs_r)}
+```
+
+``_circs`` includes all possible matrices with the same shape of the corresponding gate
+
+``_probs`` is the corresponding probability of each circ
+
+For one-bit gate, ``_circ`` includes `I`, `X`, `Y`, `Z`. The probs of nonidentity matrices are ``gate_error/2``. ``gate_error`` in `.csv` file refers to the measurement of `1-(I+Z)`.
+
+For two-bit gate, ``_circ`` includes `II`, `IX`, `IY`, `IZ`, `XI`, `XX`, `XY`, `XZ`, `YI`, `YX`, `YY`, `YZ`, `ZI`, `ZX`, `ZY`, `ZZ`. The probs of nonidentity matrices are ``gate_error/12``. The ``gate_error`` in `.csv` file refers to the measurement of `1-(II+IZ+ZI+ZZ)`.
