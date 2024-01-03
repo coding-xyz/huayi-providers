@@ -13,6 +13,24 @@ def now_time():
     return datetime.now(tz).isoformat(timespec='minutes')
 
 class build_from_file:
+    """Build a fake backend with the data files
+
+    To generate a folder containing required scripts and data files for the backend.
+
+    Args:
+        backend_name: the name of the backend, will be prefixed with 'fake' for use
+        backend_version: any numbers as you wish
+        qubits_data: the .csv file containing qubit properties
+        gates_data: the .csv file containing gate properties
+
+    Return:
+        boolean: whether the building is successful.
+    
+    This builder will automatically generate the basis_gates and coupling_map based on the information in the gates_data.
+
+    Note:
+        Only 1Q and 2Q gates are supported.
+    """
 
     def __init__(self,
                  backend_name:str,
