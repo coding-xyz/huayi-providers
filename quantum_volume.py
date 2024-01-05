@@ -1,14 +1,20 @@
+import os
+import json
+import pandas as pd
+
 from qiskit import transpile, execute
 from qiskit.circuit.library import QuantumVolume as QuantumVolumeCircuit
 from qiskit.quantum_info import Statevector
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 def get_heavy_outputs(counts):
     """Extract heavy outputs from counts dict.
     Args:
         counts (dict): Output of `.get_counts()`
     Returns:
-        list: All states with measurement probability greater
-              than the mean.
+        list: All states with measurement probability greater than the mean.
     """
     # sort the keys of `counts` by value of counts.get(key)
     sorted_counts = sorted(counts.keys(), key=counts.get)
@@ -91,7 +97,7 @@ def test_qv(device, nqubits, ncircuits, nshots):
     percent_heavy_outputs = sum(nheavies)*100/(ncircuits*nshots)
 
     results = {
-        "backend":device.name(),
+        "backend":device.name() if callable(device.name) else device.name,
         "n_qubits":nqubits,
         "QV": 2**nqubits, 
         "HOP": percent_heavy_outputs, 
@@ -106,3 +112,101 @@ def test_qv(device, nqubits, ncircuits, nshots):
           f"Percentage Heavy Outputs: {percent_heavy_outputs:.1f}%\n"
           f"Passed?: {is_pass}\n")
     return results, qv_circuits, transpiled_circuits
+
+
+
+def qv_for_depth(backend, depths, n_circuits, n_shots, filename,
+                 dirname="QV_Results"):
+    """Sweep the QV for different depths
+
+    Args:
+        backend: backend containing the noise model
+        depths: list of depths to sweep
+        n_circuits: number of random circuits for testing
+        n_shots: number of shots for each random circuit
+        filename: filename for the stored results
+        dirname: (default: QV_Results) automatically create a folder to save the results
+
+    Returns:
+        results: A dataframe including the qv_test results as well as the random circuits
+    """
+    if not os.path.isdir(f"./{dirname}"):
+        os.mkdir(f"./{dirname}")
+
+    results_df = pd.DataFrame()
+
+    for depth in depths:
+        result, qv_circs, tr_circs = test_qv(backend, 
+                                             depth, 
+                                             ncircuits=n_circuits, 
+                                             nshots=n_shots)
+        results_df = pd.concat([results_df, 
+                                pd.DataFrame(result, 
+                                             columns=["backend", "n_qubits", "QV", "HOP", "success", "n_circuits", "n_shots", "2sigma"], 
+                                             index=[0])],
+                               ignore_index=True)
+        qv_export = result | {"QV_circuits": [c.qasm() for c in qv_circs]} | {"transpiled_circuits": [c.qasm() for c in tr_circs]}
+        
+        with open(f"{dirname}/{filename}_{depth}.json", 'w') as f:
+            json.dump(qv_export, f)
+
+    return results_df
+
+
+def qv_plot(result):
+    """Show the convergence plot of qv_test
+
+    Args:
+        result (dict): result of qv_test
+    """
+
+    fig, ax = plt.subplots()
+    ax.scatter(range(result["n_circuits"]), result["cum_HOP"], s=6, c='r')
+    ax.fill_between(range(result["n_circuits"]), 
+                    np.array(result["cum_HOP"]) - np.array(result["cum_2sigma"]), 
+                    np.array(result["cum_HOP"]) + np.array(result["cum_2sigma"]), color='b', alpha=0.4)
+    ax.hlines(2/3, ax.get_xlim()[0], ax.get_xlim()[1], linestyle='dashed', color='k')
+    ax.set_ylim([0.4,1])
+    
+    fig.show()
+    
+    
+def qv_list_plot(backend_list: str | list[str],
+                 depths: list[int],
+                 dirname="QV_Results"):
+    """Show the QV test results for different depths
+
+    Args:
+        backend_list (str | list[str]): name of the backends
+        depths (list[int]): depths that have been calculated
+        dirname (str, optional): directory that stores the calculation results. Defaults to "QV_Results".
+        
+    Note:
+        The data should be strored as "{dirname}/QV_{backend}_{depth}.json"
+    """
+    
+    if isinstance(backend_list, str):
+        backend_list = [backend_list]
+    
+    fig = plt.figure()
+    
+    for backend in backend_list:
+        hop = []
+        h_low = []
+        h_high = []
+        for d in depths:
+            with open(f"{dirname}/QV_{backend}_{d}.json", 'r') as f:
+                data = json.load(f)
+                hop.append(data['HOP'])
+                h_low.append(data['HOP'] - data['2sigma'])
+                h_high.append(data['HOP'] + data['2sigma'])
+        p_hop = plt.plot( depths, hop, label=backend )
+        p_err = plt.fill_between( depths, h_low, h_high, color=p_hop[0].get_color(), alpha=0.2)
+        plt.legend()
+
+    plt.hlines(2/3*100, depths[0]-1, depths[-1]+1, color='k', linestyle='dashed' )
+    plt.xlabel('num qubits (log_2 QV)')
+    plt.ylabel('HOP (%)')
+    plt.show() 
+
+            
