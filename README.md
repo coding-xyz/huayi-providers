@@ -3,6 +3,12 @@
 
 ## Basic Use
 
+Download packages to your working directory
+
+```
+git clone https://github.com/coding-xyz/huayi-providers huayi_providers
+```
+
 Import backend
 
 ```
