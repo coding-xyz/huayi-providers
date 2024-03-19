@@ -165,7 +165,7 @@ def test_qv(device, n_qubits, n_circuits, n_shots, outputdir=None):
         f"Percentage Heavy Outputs: {cum_HOP[-1]:.1f}%\n"
         f"Passed?: {is_pass}\n"
     )
-    return results
+    return results, qv_circuits, transpiled_circuits
 
 
 
@@ -235,8 +235,10 @@ def qv_plot(result):
     fig, ax = plt.subplots()
     ax.scatter(x, y, s=6, c='r')
     ax.fill_between(x, y-yerr,  y+yerr, color='b', alpha=0.4)
-    ax.hlines(2/3, ax.get_xlim()[0], ax.get_xlim()[1], linestyle='dashed', color='k')
-    ax.set_ylim([0.4,1])
+    ax.hlines(2/3*100, ax.get_xlim()[0], ax.get_xlim()[1], linestyle='dashed', color='k')
+    ax.set_ylim([40,100])
+    plt.xlabel('num circs')
+    plt.ylabel('HOP (%)')
     
     fig.show()
     
